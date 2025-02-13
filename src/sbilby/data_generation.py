@@ -41,6 +41,7 @@ class GenerateWhitenedIFONoise_fromGWF(GenerateData):
             duration=self.old_ifo.duration,
             start_time=self.old_ifo.start_time,
         )
+        self.ifon.maximum_frequency=self.old_ifo.sampling_frequency/2
         self.ifo=self.ifon[0]
         noise=self.ifo.strain_data.time_domain_strain
         
