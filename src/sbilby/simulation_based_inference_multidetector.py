@@ -410,7 +410,7 @@ class NLEResidualLikelihood(NLELikelihood):
         ]
         for self.ifo in range(len(self.interferometers)):
             self.sbi_potential_fn=[]
-            signal_prediction = self.signal_generator[self.ifo].get_data(self.parameters)
+            signal_prediction = self.signal_generators[self.ifo].get_data(self.parameters)
             self.yobs_residual = self.yobs[self.ifo] - signal_prediction
             self.init_potential_fn()
             parameter_tensor = torch.as_tensor(parameters)
