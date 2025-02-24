@@ -173,7 +173,7 @@ class NLELikelihood(Likelihood):
         yobs,
         generators,
         interferometers,
-        bilby_prior,
+        bilby_priors,
         labels,
         num_simulations=1000,
         num_workers=1,
@@ -192,8 +192,8 @@ class NLELikelihood(Likelihood):
             TBD
         generators: instance of SimulateData
             An instance of the SimulateData class
-        bilby_prior: bilby.core.prior.PriorDict
-            The Bilby prior
+        bilby_priors: bilby.core.prior.PriorDict
+            The Bilby priors
         labels: list of str
             Unique strings used to cache the likelihoods
         num_simulations: int
@@ -208,12 +208,13 @@ class NLELikelihood(Likelihood):
         cache_directory: str
             The directory to store the likelihood cache
         """
-        super().__init__(generators[0].parameters) #Careful on this for not using list
+        for i in range(len(InterferometerList(interferometers))):
+            super().__init__(generators[i].parameters) #Careful on this for not using list
 
         self.yobs = yobs
         self.generators = generators
         self.interferometers = InterferometerList(interferometers)
-        self.bilby_prior = bilby_prior
+        self.bilby_priors = bilby_priors
         self.labels = labels
         self.num_simulations = num_simulations
         self.num_workers = num_workers
@@ -223,7 +224,7 @@ class NLELikelihood(Likelihood):
         self.cache = cache
         self.cache_directory = cache_directory
         self.fixed_parameters = [
-            key for key in self.generators[0].call_parameter_key_list if bilby_prior[key].is_fixed
+            key for key in self.generators[0].call_parameter_key_list if bilby_priors[0][key].is_fixed
         ]   #Careful on this for not using list
 
         self.meta_data = dict(
@@ -234,12 +235,16 @@ class NLELikelihood(Likelihood):
 
     def init(self):
         # Initialise SBI elements
-        self.init_prior()
+        
         self.sbi_generator=[]
         self.sbi_likelihood_estimator=[]
         self.sbi_potential_fn=[]
+        self.sbi_prior=[]
+        self.sbi_num_parameters=[]
+        self.sbi_prior_returns_numpy=[]
         
         for self.ifo in range(len(self.interferometers)):
+            self.init_prior()
             self.init_simulator()
             self.init_training()
             self.init_potential_fn()
@@ -252,27 +257,29 @@ class NLELikelihood(Likelihood):
     def init_prior(self):
         logger.info("Initialise the SBI prior")
         prior_min, prior_max = [], []
-        for key in self.generators[0].call_parameter_key_list:
-            if self.bilby_prior[key].is_fixed is False:
-                prior_min.append(self.bilby_prior[key].minimum)
-                prior_max.append(self.bilby_prior[key].maximum)
+        for key in self.generators[self.ifo].call_parameter_key_list:
+            if self.bilby_priors[self.ifo][key].is_fixed is False:
+                prior_min.append(self.bilby_priors[self.ifo][key].minimum)
+                prior_max.append(self.bilby_priors[self.ifo][key].maximum)
 
         torch_prior = sbi.utils.torchutils.BoxUniform(
             low=torch.as_tensor(prior_min),
             high=torch.as_tensor(prior_max))
         (
-            self.sbi_prior,
-            self.sbi_num_parameters,
-            self.sbi_prior_returns_numpy,
+            sbi_prior,
+            sbi_num_parameters,
+            sbi_prior_returns_numpy,
         ) = sbi.utils.user_input_checks.process_prior(torch_prior)
-
+        self.sbi_prior.append(sbi_prior)
+        self.sbi_num_parameters.append(sbi_num_parameters)
+        self.sbi_prior_returns_numpy.append(sbi_prior_returns_numpy)
     def init_simulator(self):
         logger.info("Initialise the SBI simulator")
         self.sbi_generator.append( sbi.utils.user_input_checks.process_simulator(
-            self.generators[self.ifo], self.sbi_prior, self.sbi_prior_returns_numpy
+            self.generators[self.ifo], self.sbi_prior[self.ifo], self.sbi_prior_returns_numpy[self.ifo]
         ))
         sbi.utils.user_input_checks.check_sbi_inputs(
-            self.sbi_generator[self.ifo], self.sbi_prior
+            self.sbi_generator[self.ifo], self.sbi_prior[self.ifo]
         )
 
     def init_training(self):
@@ -289,7 +296,7 @@ class NLELikelihood(Likelihood):
     def train_likelihood(self):
         logger.info("Initialise training")
         inference = sbi.inference.SNLE(
-            prior=self.sbi_prior,
+            prior=self.sbi_prior[self.ifo],
             density_estimator=self.density_estimator,
             device=self.device,
             logging_level='WARNING',
@@ -298,7 +305,7 @@ class NLELikelihood(Likelihood):
         )
         simulated_params, simulated_yobs = sbi.inference.simulate_for_sbi(
             self.sbi_generator[self.ifo],
-            proposal=self.sbi_prior,
+            proposal=self.sbi_prior[self.ifo],
             num_simulations=self.num_simulations,
             num_workers=self.num_workers,
             show_progress_bar=self.show_progress_bar,
@@ -320,19 +327,20 @@ class NLELikelihood(Likelihood):
 
     def init_potential_fn(self):
         sbi_potential_fn, _ = sbi.inference.likelihood_estimator_based_potential(
-            self.sbi_likelihood_estimator[self.ifo], self.sbi_prior, self.yobs[self.ifo]
+            self.sbi_likelihood_estimator[self.ifo], self.sbi_prior[self.ifo], self.yobs[self.ifo]
         )
         self.sbi_potential_fn.append(sbi_potential_fn)
 
     def log_likelihood(self):
         logl=0
-        parameters = [
-            np.float32(self.parameters[key])
-            for key in self.generators[0].call_parameter_key_list
-            if key not in self.fixed_parameters
-        ]
-        parameter_tensor = torch.as_tensor(parameters)
         for ifo in range(len(self.interferometers)):
+            parameters = [
+                np.float32(self.parameters[key])
+                for key in self.generators[ifo].call_parameter_key_list
+                if key not in self.fixed_parameters
+            ]
+            parameter_tensor = torch.as_tensor(parameters)
+        
             logl += self.sbi_potential_fn[ifo](parameter_tensor)
         return float(logl)
 
@@ -343,7 +351,7 @@ class NLEResidualLikelihood(NLELikelihood):
         yobs,
         generators,
         interferometers,
-        bilby_prior,
+        bilby_priors,
         labels,
         num_simulations=1000,
         num_workers=1,
@@ -373,7 +381,7 @@ class NLEResidualLikelihood(NLELikelihood):
             The directory to store the likelihood cache
         """
         super().__init__(
-            yobs=yobs, generators=list(map(lambda item: item.noise, generators)), interferometers=interferometers, bilby_prior=bilby_prior, labels=labels,
+            yobs=yobs, generators=list(map(lambda item: item.noise, generators)), interferometers=interferometers, bilby_priors=bilby_priors, labels=labels,
             num_simulations=num_simulations, num_workers=num_workers, cache=cache,
             cache_directory=cache_directory
         )
@@ -382,6 +390,9 @@ class NLEResidualLikelihood(NLELikelihood):
         self.signal_generators=[]
         self.sbi_generator=[]
         self.sbi_likelihood_estimator=[]
+        self.sbi_prior=[]
+        self.sbi_num_parameters=[]
+        self.sbi_prior_returns_numpy=[]
         for generator in generators:
             self.noise_generators.append(generator.noise)
             self.signal_generators.append(generator.signal)
@@ -389,26 +400,27 @@ class NLEResidualLikelihood(NLELikelihood):
         
     def init(self):
         # Initialise SBI elements
-        self.init_prior()
-        print(self.generators)
+        
         for self.ifo in range(len(self.interferometers)):
+            self.init_prior()
             self.init_simulator()
             self.init_training()
 
     def init_potential_fn(self):
         sbi_potential_fn, _ = sbi.inference.likelihood_estimator_based_potential(
-            self.sbi_likelihood_estimator[self.ifo], self.sbi_prior, self.yobs_residual
+            self.sbi_likelihood_estimator[self.ifo], self.sbi_prior[self.ifo], self.yobs_residual
         )
         self.sbi_potential_fn.append(sbi_potential_fn)
 
     def log_likelihood(self):
         logl=0
-        parameters = [
-            np.float32(self.parameters[key])
-            for key in self.generators[0].call_parameter_key_list
-            if key not in self.fixed_parameters
-        ]
         for self.ifo in range(len(self.interferometers)):
+            parameters = [
+                np.float32(self.parameters[key])
+                for key in self.generators[self.ifo].call_parameter_key_list
+                if key not in self.fixed_parameters
+            ]
+        
             self.sbi_potential_fn=[]
             signal_prediction = self.signal_generators[self.ifo].get_data(self.parameters)
             self.yobs_residual = self.yobs[self.ifo] - signal_prediction
