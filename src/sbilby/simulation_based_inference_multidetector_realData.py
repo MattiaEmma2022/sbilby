@@ -14,7 +14,9 @@ from bilby.core.utils import logger, check_directory_exists_and_if_not_mkdir
 from bilby.core.prior.base import Constraint
 from bilby.gw.detector import InterferometerList
 
-class GenerateData(object):
+
+
+class GenerateRealData(object):
     """
     A generic base class for data generator objects
 
@@ -30,15 +32,16 @@ class GenerateData(object):
         passed to the call method of this class.
     """
 
-    def __init__(self, parameters, call_parameter_key_list):
+    def __init__(self, parameters, call_parameter_key_list, simulation_number):
         self.parameters = parameters
         self.call_parameter_key_list = call_parameter_key_list
-
+        self.simulation_numbers=numbers = torch.arange(0, simulation_number)
+        logger.info(f"The maximum number of simulations you can do is {simulation_number}")
     def fix_parameter(self, key, val):
         self.parameters[key] = val
         self.call_parameter_key_list.pop(self.call_parameter_key_list.index(key))
 
-    def get_data(parameters: dict):
+    def get_data(parameters: dict, simulation_number):
         NotImplementedError("Method get_data() should be implemented by subclass")
 
     def __call__(self, new_parameter_list):
@@ -51,73 +54,27 @@ class GenerateData(object):
 
         for key, val in zip(self.call_parameter_key_list, new_parameter_list):
             self.parameters[key] = val
+        logger.info(f"You are left with {self.simulation_numbers.numel()} pieces of training data")    
+        if self.simulation_numbers.numel() == 0:  # Check if tensor is empty
+            raise ValueError("No more elements to select!")
 
-        return torch.as_tensor(self.get_data(self.parameters))
+        # Choose a random index
+        index = random.randint(0, self.simulation_numbers.numel() - 1)
+        
+        # Get the selected value
+        sim_number = self.simulation_numbers[index].item()  # Convert tensor to Python int
+        
+        # Remove the selected value from the tensor
+        self.simulation_numbers = torch.cat((self.simulation_numbers[:index], self.simulation_numbers[index+1:]))  # Reconstruct tensor
 
+        return torch.as_tensor(self.get_data(self.parameters,sim_number))
 
-class GenerateWhiteGaussianNoise(GenerateData):
-    """
-    A class to generate white Gaussian Noise
-
-    Parameters
-    ==========
-    data_shape: tuple
-        A tuple describing the shape of data to generate
-    sigma: float (None)
-        The sigma value for initialisation
-    """
-
-    def __init__(self, data_shape, sigma=None):
-        super(GenerateWhiteGaussianNoise, self).__init__(
-            parameters=dict(sigma=None),
-            call_parameter_key_list=["sigma"],
-        )
-        self.data_shape = data_shape
-
-    def get_data(self, parameters: dict):
-        self.parameters.update(parameters)
-        return np.random.normal(0, self.parameters["sigma"], self.data_shape)
-
-
-class GenerateDeterministicModel(GenerateData):
-    """
-    A class to generate data from a deterministic model
-
-    Parameters
-    ==========
-    model: function or callable
-        A function that takes as input a set of arguments and return a
-        realisation of the data given those parameters.
-    fixed_arguments_dict: dict
-        A dictionary containing keys (pertaining to the model arguments) and
-        values that are to be fixed.
-    """
-
-    def __init__(self, model, fixed_arguments_dict=None):
-        model_arguments = inspect.getfullargspec(model).args
-        parameters = {key: None for key in model_arguments}
-        call_parameter_key_list = [
-            key for key in parameters if key not in fixed_arguments_dict
-        ]
-
-        super(GenerateDeterministicModel, self).__init__(
-            parameters=parameters,
-            call_parameter_key_list=call_parameter_key_list,
-        )
-        self.model = model
-        self.fixed_arguments_dict = fixed_arguments_dict
-        self.parameters.update(fixed_arguments_dict)
-
-    def get_data(self, parameters: dict):
-        kwargs = self.fixed_arguments_dict | {key: parameters[key] for key in self.call_parameter_key_list}
-        return self.model(**kwargs)
-
-
-class AdditiveSignalAndNoise(GenerateData):
-    def __init__(self, signal, noise):
+class AdditiveSignalAndNoise_realData(GenerateRealData):
+    def __init__(self, signal, noise, max_simulations):
 
         self.signal = signal
         self.noise = noise
+        self.simulation_numbers=np.arange(0, max_simulations).tolist()
         
         # Extract the parameters and keys
         call_parameter_key_list = (
@@ -130,12 +87,13 @@ class AdditiveSignalAndNoise(GenerateData):
             if key in call_parameter_key_list
         }
 
-        super(AdditiveSignalAndNoise, self).__init__(
+        super(AdditiveSignalAndNoise_realData, self).__init__(
             parameters=parameters,
             call_parameter_key_list=call_parameter_key_list,
+            simulation_number=max_simulations
         )
 
-    def get_data(self, parameters: dict):
+    def get_data(self, parameters: dict, simulation_number):
         sparameters = {
             key: val
             for key, val in parameters.items()
@@ -146,34 +104,27 @@ class AdditiveSignalAndNoise(GenerateData):
             for key, val in parameters.items()
             if key in self.noise.call_parameter_key_list
         }
-        sdata = self.signal.get_data(sparameters)
-        ndata = self.noise.get_data(nparameters)
-        
+        #print("Total number",self.simulation_numbers)
+        #if len(self.simulation_numbers) < 1:
+        #    raise ValueError("You do not have enough training data!")
+        #sim_number=random.choice(self.simulation_numbers)
+        #print("Simulation number random choice",sim_number)
+        sdata = self.signal.get_data(sparameters,simulation_number)
+        #print("Signal data",sdata)
+        ndata = self.noise.get_data(nparameters, simulation_number)
+        #print("Noise data",ndata)
+        #self.simulation_numbers.remove(sim_number)
+        #print(self.simulation_numbers)
         return sdata + ndata
 
 
 
 
-class AdditiveWhiteGaussianNoise(AdditiveSignalAndNoise):
-    def __init__(self, model, bilby_prior, fixed_arguments_dict=None):
-        # Create the signal instance
-        signal = GenerateDeterministicModel(
-            model=model, fixed_arguments_dict=fixed_arguments_dict
-        )
-
-        # Create the noise instance
-        signal_shape = signal.get_data(bilby_prior.sample()).shape
-        noise = GenerateWhiteGaussianNoise(data_shape=signal_shape)
-
-        super(AdditiveWhiteGaussianNoise, self).__init__(
-            signal=signal,
-            noise=noise,
-        )
-
-class NLELikelihood(Likelihood):
+class NLELikelihood_realData(Likelihood):
     def __init__(
         self,
         yobs,
+        psd,
         generators,
         interferometers,
         bilby_priors,
@@ -182,7 +133,7 @@ class NLELikelihood(Likelihood):
         num_workers=1,
         density_estimator="maf",
         device="cpu",
-        show_progress_bar=False,
+        show_progress_bar=True,
         cache=True,
         cache_directory="likelihood_cache",
     ):
@@ -215,6 +166,7 @@ class NLELikelihood(Likelihood):
             super().__init__(generators[i].parameters) #Careful on this for not using list
 
         self.yobs = yobs
+        self.psd=psd
         self.generators = generators
         self.interferometers = InterferometerList(interferometers)
         self.bilby_priors = bilby_priors
@@ -313,7 +265,7 @@ class NLELikelihood(Likelihood):
             num_workers=self.num_workers,
             show_progress_bar=self.show_progress_bar,
         )
-
+        logger.info(f"Number of produced simulations {len(simulated_yobs)}")
         inf_and_sims = inference.append_simulations(simulated_params, simulated_yobs)
 
         self.sbi_likelihood_estimator.append(inf_and_sims.train())
@@ -348,10 +300,11 @@ class NLELikelihood(Likelihood):
         return float(logl)
 
 
-class NLEResidualLikelihood(NLELikelihood):
+class NLEResidualLikelihood_realData(NLELikelihood_realData):
     def __init__(
         self,
         yobs,
+        psd,
         generators,
         interferometers,
         bilby_priors,
@@ -384,7 +337,7 @@ class NLEResidualLikelihood(NLELikelihood):
             The directory to store the likelihood cache
         """
         super().__init__(
-            yobs=yobs, generators=list(map(lambda item: item.noise, generators)), interferometers=interferometers, bilby_priors=bilby_priors, labels=labels,
+            yobs=yobs,psd=psd, generators=list(map(lambda item: item.noise, generators)), interferometers=interferometers, bilby_priors=bilby_priors, labels=labels,
             num_simulations=num_simulations, num_workers=num_workers, cache=cache,
             cache_directory=cache_directory
         )
@@ -400,7 +353,7 @@ class NLEResidualLikelihood(NLELikelihood):
             self.noise_generators.append(generator.noise)
             self.signal_generators.append(generator.signal)
         self.interferometers = InterferometerList(interferometers)
-        
+        self.psd=psd
     def init(self):
         # Initialise SBI elements
         
@@ -425,14 +378,9 @@ class NLEResidualLikelihood(NLELikelihood):
             ]
         
             self.sbi_potential_fn=[]
-            signal_prediction = self.signal_generators[self.ifo].get_data(self.parameters)
+            signal_prediction = self.signal_generators[self.ifo].get_data(self.parameters,psd=self.psd[self.ifo])
             self.yobs_residual = self.yobs[self.ifo] - signal_prediction
             self.init_potential_fn()
             parameter_tensor = torch.as_tensor(parameters)
             logl += self.sbi_potential_fn[0](parameter_tensor)
         return float(logl)
-
-
-
-
-
