@@ -8,6 +8,8 @@ import sbi.utils
 import sbi.inference
 import torch
 import random
+import matplotlib.pyplot as plt
+
 
 from bilby.core.likelihood.base import Likelihood
 from bilby.core.utils import logger, check_directory_exists_and_if_not_mkdir
@@ -35,7 +37,7 @@ class GenerateRealData(object):
     def __init__(self, parameters, call_parameter_key_list, simulation_number):
         self.parameters = parameters
         self.call_parameter_key_list = call_parameter_key_list
-        self.simulation_numbers=numbers = torch.arange(0, simulation_number)
+        self.simulation_numbers = torch.arange(0, simulation_number)
         logger.info(f"The maximum number of simulations you can do is {simulation_number}")
     def fix_parameter(self, key, val):
         self.parameters[key] = val
@@ -104,17 +106,11 @@ class AdditiveSignalAndNoise_realData(GenerateRealData):
             for key, val in parameters.items()
             if key in self.noise.call_parameter_key_list
         }
-        #print("Total number",self.simulation_numbers)
-        #if len(self.simulation_numbers) < 1:
-        #    raise ValueError("You do not have enough training data!")
-        #sim_number=random.choice(self.simulation_numbers)
-        #print("Simulation number random choice",sim_number)
+        
         sdata = self.signal.get_data(sparameters,simulation_number)
-        #print("Signal data",sdata)
+        
         ndata = self.noise.get_data(nparameters, simulation_number)
-        #print("Noise data",ndata)
-        #self.simulation_numbers.remove(sim_number)
-        #print(self.simulation_numbers)
+        
         return sdata + ndata
 
 
@@ -163,6 +159,7 @@ class NLELikelihood_realData(Likelihood):
             The directory to store the likelihood cache
         """
         for i in range(len(InterferometerList(interferometers))):
+            
             super().__init__(generators[i].parameters) #Careful on this for not using list
 
         self.yobs = yobs
@@ -267,7 +264,6 @@ class NLELikelihood_realData(Likelihood):
         )
         logger.info(f"Number of produced simulations {len(simulated_yobs)}")
         inf_and_sims = inference.append_simulations(simulated_params, simulated_yobs)
-
         self.sbi_likelihood_estimator.append(inf_and_sims.train())
 
         if self.cache:
@@ -379,8 +375,80 @@ class NLEResidualLikelihood_realData(NLELikelihood_realData):
         
             self.sbi_potential_fn=[]
             signal_prediction = self.signal_generators[self.ifo].get_data(self.parameters,psd=self.psd[self.ifo])
+            # plt.plot(signal_prediction)
+            # plt.show()
+            # plt.close()
+            # plt.plot(self.yobs[self.ifo])
+            # plt.show()
+            # plt.close()
             self.yobs_residual = self.yobs[self.ifo] - signal_prediction
+            # plt.plot(self.yobs_residual)
+            # plt.show()
+            # plt.close()
             self.init_potential_fn()
             parameter_tensor = torch.as_tensor(parameters)
             logl += self.sbi_potential_fn[0](parameter_tensor)
         return float(logl)
+
+
+
+class GenerateRealData_removal(object):
+    """
+    A generic base class for data generator objects
+
+    SimulateData instances generate data from an underlying model in a form
+    suitable to pass into the SBI package
+
+    Parameters
+    ==========
+    parameters: dictionary
+        A dictionary of parameters for initialisation.
+    call_parameter_key_list: list
+        A list of keys corresponding to the ordering of the parameters to be
+        passed to the call method of this class.
+    """
+
+    def __init__(self, parameters, call_parameter_key_list, simulation_number, removal_mode=True):
+        self.parameters = parameters
+        self.call_parameter_key_list = call_parameter_key_list
+        self.simulation_numbers = torch.arange(0, simulation_number)
+        self.simulation_counter = {i: 0 for i in self.simulation_numbers.tolist()}
+        logger.info(f"The maximum number of simulations you can do is {simulation_number}")
+    def fix_parameter(self, key, val):
+        self.parameters[key] = val
+        self.call_parameter_key_list.pop(self.call_parameter_key_list.index(key))
+
+    def get_data(parameters: dict, simulation_number):
+        NotImplementedError("Method get_data() should be implemented by subclass")
+
+    def __call__(self, new_parameter_list):
+        if len(new_parameter_list) != len(self.call_parameter_key_list):
+            raise ValueError(
+                f"Instance of {self.__class__} called with parameter list of "
+                f"length {len(new_parameter_list)}, but requires a list of "
+                f"length {len(self.call_parameter_key_list)}"
+            )
+    
+        for key, val in zip(self.call_parameter_key_list, new_parameter_list):
+            self.parameters[key] = val
+        
+        if self.simulation_numbers.numel() == 0:
+            raise ValueError("No more elements to select!")
+    
+        index = random.randint(0, self.simulation_numbers.numel() - 1)
+        sim_number = self.simulation_numbers[index].item()
+    
+        if self.removal_mode:
+            logger.info(f"You are left with {self.simulation_numbers.numel()} pieces of training data")    
+            self.simulation_numbers = torch.cat((
+                self.simulation_numbers[:index],
+                self.simulation_numbers[index+1:]
+            ))
+        else:
+            self.simulation_counter[sim_number] += 1
+            logger.info(
+                f"Simulation number {sim_number} selected. "
+                f"Now used {self.simulation_counter[sim_number]} times."
+            )
+    
+        return torch.as_tensor(self.get_data(self.parameters, sim_number))

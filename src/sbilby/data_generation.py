@@ -7,6 +7,7 @@ import sbi
 import sbi.utils
 import sbi.inference
 import torch
+import matplotlib.pyplot as plt
 
 from gwpy.timeseries import TimeSeries
 from scipy.signal.windows import tukey
@@ -449,12 +450,10 @@ class GenerateWhitenedIFONoise_realData(GenerateRealData):
         self.parameters.update(parameters)
         self.simulation_number=simulation_number
         sigma = self.parameters["sigma_"+self.ifo.name.lower()]
-        
         psd=self.psd[self.ifo.name][self.simulation_number] #Start again here
         frequency_array=psd.frequencies
         frequency_mask = ((np.array(frequency_array) >= 20)&(np.array(frequency_array) <= self.ifo.sampling_frequency/2))
         noise=self.data[self.ifo.name][self.simulation_number]
-        
         roll_off=0.2
         alpha=2*roll_off/self.ifo.duration
         window = tukey(len(noise), alpha=alpha)
@@ -508,7 +507,7 @@ class GenerateWhitenedSignal_realData(GenerateRealData):
         self.parameters.update(parameters)
         self.simulation_number=simulation_number
         parameters = self.parameters
-
+        
         waveform_polarizations = self.waveform_generator.frequency_domain_strain(parameters)
         if psd is None:
             psd=self.psd[self.ifo.name][self.simulation_number] #Start again here
@@ -561,3 +560,114 @@ class GenerateWhitenedSignal_realData(GenerateRealData):
             ht_whitened=ht_whitened[mask]
 
         return ht_whitened
+
+
+
+######################## Functions to work with real data ###################################
+
+def create_ifo(data, ifo, trigger_time, inter,psd_yobs_use, waveform_generator, injection_parameters):
+     psd_yobs=[]
+     
+     yobs_first=data[ifo+'_trigger']
+     psd_yobs.append(psd_yobs_use)
+     #Create ifo with the data from the detector
+     ifon = bilby.gw.detector.get_empty_interferometer(ifo)
+     ifon.strain_data.set_from_gwpy_timeseries(data[ifo+'_trigger'])
+     ifon.power_spectral_density = bilby.gw.detector.PowerSpectralDensity(
+         frequency_array=psd_yobs_use.frequencies.value, psd_array=psd_yobs_use.value
+     )
+     ifon.maximum_frequency=2048
+     ifon.minimum_frequency = 20
+     #Inject signal in ifo
+     _ = ifon.inject_signal(
+     waveform_generator=waveform_generator, parameters=injection_parameters
+ )
+     return ifon
+
+def load_or_generate_data(trigger_time, interferometers, data_duration, psd_data_length=0, data_dir="/home/mattia.emma/public_html/NLE/sbilbi/data", label="data"):
+    """
+    Loads data from a pickle file if it exists, otherwise generates and saves it.
+
+    Parameters:
+        trigger_time (float): GPS trigger time
+        interferometers (list): List of interferometers
+        data_duration (int): Duration of the data segment
+        psd_data_length (int): Extra duration if needed for PSD computation
+        data_dir (str): Directory to store/load the data
+        label (str): Label for the file name
+
+    Returns:
+        data (dict): The data dictionary (either loaded or newly generated)
+    """
+    total_duration = data_duration + psd_data_length
+    file_name = f"{data_dir}/{label}_{trigger_time}_{total_duration}.pkl"
+
+    if os.path.exists(file_name):
+        with open(file_name, "rb") as f:
+            print(f"Loading {label} from existing file: {file_name}")
+            return pickle.load(f)
+    else:
+        print(f"{label} file not found. Generating new data...")
+        data = get_data(trigger_time, interferometers, total_duration)
+        with open(file_name, "wb") as f:
+            pickle.dump(data, f)
+        return data
+
+
+
+def get_data(trigger_time, ifos,duration):
+ data={}
+ start_before=trigger_time-10-duration
+ end_before=trigger_time-10
+ start_after=trigger_time+10
+ end_after=trigger_time+10+duration
+ for ifo in ifos:
+     data[ifo+'_before']=TimeSeries.fetch_open_data(ifo, start_before, end_before, cache=True)
+     data[ifo+'_after']=TimeSeries.fetch_open_data(ifo, start_after, end_after, cache=True)
+     data[ifo+'_trigger']=TimeSeries.fetch_open_data(ifo, trigger_time-2, trigger_time+2, cache=True)
+ return data 
+
+
+
+
+
+
+def slice_data_and_compute_psd(data, data_psd, interferometers, data_duration, sample_rate=4096):
+    """
+    Slice time-series data into 4s chunks and compute PSD from 16s chunks.
+    
+    Parameters:
+        data (dict): Dictionary containing time-series data for each interferometer and segment ('before'/'after')
+        data_psd (dict): Dictionary containing time-series data for PSD computation
+        interferometers (list): List of interferometer names (e.g., ['H1', 'L1'])
+        data_duration (int): Duration of the total data segment in seconds
+        sample_rate (int): Sampling rate in Hz (default: 4096)
+        
+    Returns:
+        data_4s (dict): Dictionary with 4s sliced data chunks per interferometer
+        psd (dict): Dictionary with PSDs computed from 16s chunks per interferometer
+    """
+    data_4s = {}
+    data_psd_16s = {}
+    psd = {}
+
+    for ifo in interferometers:
+        data_4s[ifo] = []
+        data_psd_16s[ifo] = []
+
+        for name in ['before', 'after']:
+            for i in range(data_duration - 4):
+                start = int(i * sample_rate)
+                end_4s = start + 4 * sample_rate
+                end_16s = start + 16 * sample_rate
+
+                data_4s[ifo].append(data[f"{ifo}_{name}"][start:end_4s])
+                data_psd_16s[ifo].append(data_psd[f"{ifo}_{name}"][start:end_16s])
+
+        # Compute PSD from each 16s segment
+        psd[ifo] = [
+            segment.psd(fftlength=4, overlap=None, window='hann', method='median')
+            for segment in data_psd_16s[ifo]
+        ]
+
+    return data_4s, psd
