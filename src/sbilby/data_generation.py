@@ -11,7 +11,7 @@ import matplotlib.pyplot as plt
 
 from gwpy.timeseries import TimeSeries
 from scipy.signal.windows import tukey
-from bilby.core.likelihood.base import Likelihood
+from bilby.core.likelihood import Likelihood  #removed .base from files for new bilby version
 from bilby.core.utils import logger, check_directory_exists_and_if_not_mkdir
 from bilby.core.prior.base import Constraint
 from .simulation_based_inference import GenerateData
@@ -584,7 +584,7 @@ def create_ifo(data, ifo, trigger_time, inter,psd_yobs_use, waveform_generator, 
  )
      return ifon
 
-def load_or_generate_data(trigger_time, interferometers, data_duration, psd_data_length=0, data_dir="/home/mattia.emma/public_html/NLE/sbilbi/data", label="data"):
+def load_or_generate_data(trigger_time, interferometers, data_duration, psd_data_length=0, data_dir="/home/mattia.emma/public_html/NLE/sbilbi/data", label="data", cache=True):
     """
     Loads data from a pickle file if it exists, otherwise generates and saves it.
 
@@ -608,23 +608,23 @@ def load_or_generate_data(trigger_time, interferometers, data_duration, psd_data
             return pickle.load(f)
     else:
         print(f"{label} file not found. Generating new data...")
-        data = get_data(trigger_time, interferometers, total_duration)
+        data = get_data(trigger_time, interferometers, total_duration, cache)
         with open(file_name, "wb") as f:
             pickle.dump(data, f)
         return data
 
 
 
-def get_data(trigger_time, ifos,duration):
+def get_data(trigger_time, ifos,duration, cache=True):
  data={}
  start_before=trigger_time-10-duration
  end_before=trigger_time-10
  start_after=trigger_time+10
  end_after=trigger_time+10+duration
  for ifo in ifos:
-     data[ifo+'_before']=TimeSeries.fetch_open_data(ifo, start_before, end_before, cache=True)
-     data[ifo+'_after']=TimeSeries.fetch_open_data(ifo, start_after, end_after, cache=True)
-     data[ifo+'_trigger']=TimeSeries.fetch_open_data(ifo, trigger_time-2, trigger_time+2, cache=True)
+     data[ifo+'_before']=TimeSeries.fetch_open_data(ifo, start_before, end_before, cache=cache)
+     data[ifo+'_after']=TimeSeries.fetch_open_data(ifo, start_after, end_after, cache=cache)
+     data[ifo+'_trigger']=TimeSeries.fetch_open_data(ifo, trigger_time-2, trigger_time+2, cache=cache)
  return data 
 
 

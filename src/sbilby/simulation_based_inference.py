@@ -7,8 +7,9 @@ import sbi
 import sbi.utils
 import sbi.inference
 import torch
+import matplotlib.pyplot as plt 
 
-from bilby.core.likelihood.base import Likelihood
+from bilby.core.likelihood import Likelihood
 from bilby.core.utils import logger, check_directory_exists_and_if_not_mkdir
 from bilby.core.prior.base import Constraint
 
@@ -301,7 +302,13 @@ class NLELikelihood(Likelihood):
         inf_and_sims = inference.append_simulations(simulated_params, simulated_yobs)
 
         self.sbi_likelihood_estimator = inf_and_sims.train()
-
+        # Plot the training and validation loss as a function of the training epochs without using tensorboard.
+        # plt.plot(self.sbi_likelihood_estimator._summary['validation_log_probs'],label = 'validation',c = 'k')
+        # plt.plot(self.sbi_likelihood_estimator._summary['training_log_probs'],label = 'training',c= 'tab:green')
+        # plt.ylabel('loss')
+        # plt.xlabel('Epochs')
+        # plt.legend(loc= 'best')
+        # plt.savefig("/home/mattia.emma/public_html/NLE/sbilbi/glitchy_invetigations/Study_bias/Training_"+str(self.num_simulations)+".png",dpi=100)
         if self.cache:
             logger.info(f"Writing the cached NLE to {self.cache_filename}")
             check_directory_exists_and_if_not_mkdir(self.cache_directory)

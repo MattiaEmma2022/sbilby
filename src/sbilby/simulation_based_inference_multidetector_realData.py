@@ -11,7 +11,7 @@ import random
 import matplotlib.pyplot as plt
 
 
-from bilby.core.likelihood.base import Likelihood
+from bilby.core.likelihood import Likelihood
 from bilby.core.utils import logger, check_directory_exists_and_if_not_mkdir
 from bilby.core.prior.base import Constraint
 from bilby.gw.detector import InterferometerList
@@ -225,6 +225,7 @@ class NLELikelihood_realData(Likelihood):
         self.sbi_prior.append(sbi_prior)
         self.sbi_num_parameters.append(sbi_num_parameters)
         self.sbi_prior_returns_numpy.append(sbi_prior_returns_numpy)
+        
     def init_simulator(self):
         logger.info("Initialise the SBI simulator")
         self.sbi_generator.append( sbi.utils.user_input_checks.process_simulator(
@@ -264,8 +265,14 @@ class NLELikelihood_realData(Likelihood):
         )
         logger.info(f"Number of produced simulations {len(simulated_yobs)}")
         inf_and_sims = inference.append_simulations(simulated_params, simulated_yobs)
-        self.sbi_likelihood_estimator.append(inf_and_sims.train())
-
+        self.sbi_likelihood_estimator.append(inf_and_sims.train(show_train_summary=True))
+        # Plot the training and validation loss as a function of the training epochs without using tensorboard.
+        plt.plot(inference._summary['validation_log_probs'],label = 'validation',c = 'k')
+        plt.plot(inference._summary['training_log_probs'],label = 'training',c= 'tab:green')
+        plt.ylabel('loss')
+        plt.xlabel('Epochs')
+        plt.legend(loc= 'best')
+        plt.savefig("/home/mattia.emma/public_html/NLE/sbilbi/glitchy_invetigations/Study_bias/Training_"+str(self.num_simulations)+"_"+str(self.ifo)+".png",dpi=100)
         if self.cache:
             logger.info(f"Writing the cached NLE to {self.cache_filename}")
             check_directory_exists_and_if_not_mkdir(self.cache_directory)
@@ -274,7 +281,7 @@ class NLELikelihood_realData(Likelihood):
 
     @property
     def cache_filename(self):
-        return f"{self.cache_directory}/{self.labels[self.ifo]}_{self.num_simulations}.pkl"
+        return f"{self.cache_directory}/{self.labels[self.ifo]}.pkl"
 
     def init_potential_fn(self):
         sbi_potential_fn, _ = sbi.inference.likelihood_estimator_based_potential(
@@ -375,16 +382,9 @@ class NLEResidualLikelihood_realData(NLELikelihood_realData):
         
             self.sbi_potential_fn=[]
             signal_prediction = self.signal_generators[self.ifo].get_data(self.parameters,psd=self.psd[self.ifo])
-            # plt.plot(signal_prediction)
-            # plt.show()
-            # plt.close()
-            # plt.plot(self.yobs[self.ifo])
-            # plt.show()
-            # plt.close()
+           
             self.yobs_residual = self.yobs[self.ifo] - signal_prediction
-            # plt.plot(self.yobs_residual)
-            # plt.show()
-            # plt.close()
+            
             self.init_potential_fn()
             parameter_tensor = torch.as_tensor(parameters)
             logl += self.sbi_potential_fn[0](parameter_tensor)

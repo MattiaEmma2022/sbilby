@@ -9,7 +9,7 @@ import sbi.inference
 import torch
 import random
 
-from bilby.core.likelihood.base import Likelihood
+from bilby.core.likelihood import Likelihood
 from bilby.core.utils import logger, check_directory_exists_and_if_not_mkdir
 from bilby.core.prior.base import Constraint
 from bilby.gw.detector import InterferometerList

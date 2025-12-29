@@ -27,7 +27,7 @@ class BenchmarkLikelihood(object):
         self,
         benchmark_likelihood,
         reference_likelihood,
-        prior,
+        priors,
         reference_prior,
         outdir,
         injection_parameters,
@@ -35,7 +35,7 @@ class BenchmarkLikelihood(object):
     ):
         self.benchmark_likelihood = benchmark_likelihood
         self.reference_likelihood = reference_likelihood
-        self.prior = prior
+        self.priors = priors
         self.reference_prior = reference_prior
         self.outdir = outdir
         self.injection_parameters = injection_parameters
@@ -48,7 +48,7 @@ class BenchmarkLikelihood(object):
     def _time_likelihood(self, likelihood, n, name):
         eval_times = []
         for _ in range(n):
-            likelihood.parameters.update(self.prior.sample())
+            likelihood.parameters.update(self.priors[0].sample())
             start = time.time()
             likelihood.log_likelihood()
             end = time.time()
@@ -67,22 +67,22 @@ class BenchmarkLikelihood(object):
         if run_sampler_kwargs is not None:
             kwargs.update(run_sampler_kwargs)
 
-        result_reference = bilby.run_sampler(
-            likelihood=self.reference_likelihood,
-            priors=self.reference_prior,
-            outdir=self.outdir,
-            injection_parameters=injection_parameters,
-            label=self.benchmark_likelihood.label + "_REFERENCE",
-            conversion_function=bilby.gw.conversion.generate_all_bbh_parameters,
-            **kwargs,
-        )
+        # result_reference = bilby.run_sampler(
+        #     likelihood=self.reference_likelihood,
+        #     priors=self.reference_prior,
+        #     outdir=self.outdir,
+        #     injection_parameters=injection_parameters,
+        #     label=self.benchmark_likelihood.labels[0] + "_REFERENCE",
+        #     conversion_function=bilby.gw.conversion.generate_all_bbh_parameters,
+        #     **kwargs,
+        # )
         
         result_benchmark = bilby.run_sampler(
             likelihood=self.benchmark_likelihood,
-            priors=self.prior,
+            priors=self.priors,
             outdir=self.outdir,
             injection_parameters=injection_parameters,
-            label=self.benchmark_likelihood.label,
+            label=self.benchmark_likelihood.labels[0],
             #conversion_function=bilby.gw.conversion.generate_all_bbh_parameters,
             **kwargs,
         )
@@ -208,7 +208,8 @@ for key in [
     "theta_jn"
 ]:
     signal_priors[key] = injection_parameters[key]
-noise_priors = bilby.core.prior.PriorDict(dict(sigma=bilby.core.prior.Uniform(0, 2, 'sigma')))
+noise_priors_h1 = bilby.core.prior.PriorDict(dict(sigma_h1=bilby.core.prior.Uniform(0, 2, 'sigma_h1')))
+noise_priors_l1 = bilby.core.prior.PriorDict(dict(sigma_l1=bilby.core.prior.Uniform(0, 2, 'sigma_l1')))
 
 duration = 4.0
 sampling_frequency = args.fs #4096
@@ -272,7 +273,17 @@ genB_waveform_generator = bilby.gw.WaveformGenerator(
     waveform_arguments=waveform_arguments)
 
 
-priors = noise_priors | signal_priors
+priors_h1 = noise_priors_h1 | signal_priors 
+priors_h1 = bilby.core.prior.PriorDict(copy.deepcopy(priors_h1))
+priors_h1.convert_floats_to_delta_functions()
+
+priors_l1 = noise_priors_l1 | signal_priors 
+priors_l1 = bilby.core.prior.PriorDict(copy.deepcopy(priors_l1))
+priors_l1.convert_floats_to_delta_functions()
+
+noise_priors= [noise_priors_h1, noise_priors_l1]
+nrle_priors=[priors_h1, priors_l1]
+priors= noise_priors_h1 | signal_priors | noise_priors_l1
 priors = bilby.core.prior.PriorDict(copy.deepcopy(priors))
 priors.convert_floats_to_delta_functions()
 
@@ -282,13 +293,11 @@ full_signal_and_noise=[]
 full_noise=[]
 full_signal=[]
 for i in range(len(interferometers)):
-    full_noise.append(GenerateWhitenedIFONoise_fromGWF(ifo_noise[i], use_mask, times))
+    full_noise.append(GenerateWhitenedIFONoise_fromGWF(ifo_noise[i],copy.deepcopy(noise_priors[i]) , use_mask, times))
     full_signal.append(GenerateWhitenedSignal_fromGWF(ifo_signal[i], waveform_generator, copy.deepcopy(signal_priors), use_mask, times))
     addition=AdditiveSignalAndNoise(full_signal[i], full_noise[i])
     full_signal_and_noise.append(addition)
-    print(addition.parameters)
-for i in range(len(interferometers)):    
- print(full_signal_and_noise[i].parameters)
+
     
 reference_priors = copy.deepcopy(signal_priors)
 reference_priors = bilby.core.prior.PriorDict(reference_priors)
@@ -307,7 +316,7 @@ benchmark_likelihood = sbilby.simulation_based_inference_multidetector.NLEResidu
         yobs,
         full_signal_and_noise,
         interferometers,
-        bilby_prior=copy.deepcopy(priors),
+        bilby_priors=copy.deepcopy(nrle_priors),
         labels=labels,
         num_simulations=num_simulations,
         cache_directory='likelihood_cache',
@@ -315,41 +324,42 @@ benchmark_likelihood = sbilby.simulation_based_inference_multidetector.NLEResidu
         #show_progress_bar=True,
 )
 
+
+
+# Need this as the cutting is not applied to the generator yobs yet
+self = full_signal[0]
+window_start = self.ifo.start_time +(self.ifo.duration/2.)- self.time_lower
+window_end = self.ifo.start_time + (self.ifo.duration/2.) + self.time_upper
+mask = (self.ifo.time_array >= window_start) & (self.ifo.time_array <= window_end)
+for i in range(len(interferometers)):
+    benchmark_likelihood.yobs[i] = benchmark_likelihood.yobs[i][mask]
+
 start=time.time()
 benchmark_likelihood.init()
 end=time.time()
 training_time=end-start
-
-# # Need this as the cutting is not applied to the generator yobs yet
-# self = full_signal
-# window_start = self.ifo.start_time +(self.ifo.duration/2.)- self.time_lower
-# window_end = self.ifo.start_time + (self.ifo.duration/2.) + self.time_upper
-# mask = (self.ifo.time_array >= window_start) & (self.ifo.time_array <= window_end)
-# benchmark_likelihood.yobs = benchmark_likelihood.yobs[mask]
-
-
 # ######################################   Benchmark ##################################
-# bench = BenchmarkLikelihood(
-#     benchmark_likelihood,
-#     reference_likelihood,
-#     priors,
-#     reference_priors,
-#     outdir,
-#     injection_parameters=injection_parameters,
-#     training_time=training_time,
+bench = BenchmarkLikelihood(
+    benchmark_likelihood,
+    reference_likelihood,
+    priors,
+    reference_priors,
+    outdir,
+    injection_parameters=injection_parameters,
+    training_time=training_time,
     
-# )
-# bench.benchmark_time()
-# bench.benchmark_posterior_sampling(
-#     dict(
-#         sampler="dynesty",
-#         nlive=args.nlive,
-#         dlogz=args.dlogz,
-#         resume=args.resume,
-#         print_method="interval-10",
-#         npool=8,
-#         sample="acceptance-walk",
-#         check_point_delta_t=180,
-#     )
-# )
-# bench.write_results()
+)
+#bench.benchmark_time()
+bench.benchmark_posterior_sampling(
+    dict(
+        sampler="dynesty",
+        nlive=args.nlive,
+        dlogz=args.dlogz,
+        resume=args.resume,
+        print_method="interval-10",
+        npool=8,
+        sample="acceptance-walk",
+        check_point_delta_t=180,
+    )
+)
+#bench.write_results()

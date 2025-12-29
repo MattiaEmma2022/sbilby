@@ -16,8 +16,8 @@ import pickle
 
 
 import sbilby
-from sbilby.simulation_based_inference import GenerateData
-from sbilby.simulation_based_inference import AdditiveSignalAndNoise
+from sbilby.simulation_based_inference_multidetector import GenerateData
+from sbilby.simulation_based_inference_multidetector import AdditiveSignalAndNoise
 import matplotlib.pyplot as plt
 from sbilby.data_generation import GenerateWhitenedIFONoise_fromGWF
 from sbilby.data_generation import GenerateWhitenedSignal_fromGWF
@@ -167,13 +167,13 @@ np.random.seed(args.rseed)
 times=[args.time_lower, args.time_upper]
 num_simulations = args.num_simulations
 ################################################# Old code ######################################################
-    
+interferometers=["H1","L1"]  
 # Standard Bilby
 injection_parameters = dict(
-    chirp_mass=30.0,
+    chirp_mass=28.0,
     mass_ratio=1.0,
-    a_1=0.4,
-    a_2=0.3,
+    a_1=0.0,
+    a_2=0.0,
     tilt_1=0.5,
     tilt_2=1.0,
     phi_12=1.7,
@@ -284,10 +284,14 @@ reference_priors.convert_floats_to_delta_functions()
 
 #Training the neural network 
 label = f"N{num_simulations}_fs{sampling_frequency}_seed{args.rseed}_R{args.repeat}_TL{args.time_lower}_TU{args.time_upper}"
-
-benchmark_likelihood = sbilby.simulation_based_inference.NLEResidualLikelihood(
+if os.path.exists("../likelihood_cache/"+label+".pkl"):
+    os.remove("../likelihood_cache/"+label+".pkl")
+else:
+    print("File not found!")
+benchmark_likelihood = sbilby.simulation_based_inference_multidetector.NLEResidualLikelihood(
         yobs,
         full_signal_and_noise,
+        interferometers,
         bilby_prior=copy.deepcopy(priors),
         label=label,
         num_simulations=num_simulations,
@@ -321,16 +325,16 @@ bench = BenchmarkLikelihood(
     
 )
 bench.benchmark_time()
-bench.benchmark_posterior_sampling(
-    dict(
-        sampler="dynesty",
-        nlive=args.nlive,
-        dlogz=args.dlogz,
-        resume=args.resume,
-        print_method="interval-10",
-        npool=8,
-        sample="acceptance-walk",
-        check_point_delta_t=180,
-    )
-)
-bench.write_results()
+# bench.benchmark_posterior_sampling(
+#     dict(
+#         sampler="dynesty",
+#         nlive=args.nlive,
+#         dlogz=args.dlogz,
+#         resume=args.resume,
+#         print_method="interval-10",
+#         npool=8,
+#         sample="acceptance-walk",
+#         check_point_delta_t=180,
+#     )
+# )
+# bench.write_results()
