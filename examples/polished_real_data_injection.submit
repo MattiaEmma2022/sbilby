@@ -1,0 +1,35 @@
+LIKELIHOOD=RNLE
+NLIVE=1500
+DIMENSIONS=1
+NUM_SIMULATIONS=3050
+FS=4096
+SEED=106
+BASE=14
+TL=0.8
+TU=0.2
+DURATION=3600
+REPEAT = $$([$(BASE) + $(PROCESS)])
+
+accounting_group=ligo.dev.o4.cbc.pe.bilby
+
+executable   = /home/mattia.emma/public_html/NLE/sbilbi/Polished_real_data_injection.py
+arguments    = --likelihood $(LIKELIHOOD) --nlive $(NLIVE) --num-simulations $(NUM_SIMULATIONS) --repeat $(REPEAT) --fs $(FS) --rseed $(SEED) --time_lower $(TL) --time_upper $(TU) --duration $(DURATION)
+output       = /home/mattia.emma/public_html/NLE/sbilbi/logs/$(LIKELIHOOD)_$(DIMENSIONS)D_N$(NUM_SIMULATIONS)_B$(BASE)_P$(REPEAT)_S$(SEED)_FS$(FS)_TL$(TL)_TU$(TU).out
+error       = /home/mattia.emma/public_html/NLE/sbilbi/logs/$(LIKELIHOOD)_$(DIMENSIONS)D_N$(NUM_SIMULATIONS)_B$(BASE)_P$(REPEAT)_S$(SEED)_FS$(FS)_TL$(TL)_TU$(TU).err
+log       = /home/mattia.emma/public_html/NLE/sbilbi/logs/$(LIKELIHOOD)_$(DIMENSIONS)D_N$(NUM_SIMULATIONS)_B$(BASE)_P$(REPEAT)_S$(SEED)_FS$(FS)_TL$(TL)_TU$(TU).log
+
+request_cpus   = 2
+request_memory = 10096M
+request_disk   = 10240K
+
+should_transfer_files = no
+#when_to_transfer_output = on_exit
+#transfer_input_files=  Test_aligned_h1_4096.gwf, Test_aligned_l1_4096.gwf, Test_aligned_noise_h1_4096.gwf, Test_aligned_noise_l1_4096.gwf
+#transfer_output_files = RESULTS_real_data_injection/, real_data_injection/, likelihood_cache/
+requirements = (Machine != "ccs8007.hawk.supercomputingwales.ac.uk")
+
+#stream_error = True
+#stream_output = True
+#preserve_relative_paths = True
+
+queue 1
