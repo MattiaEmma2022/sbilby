@@ -1,0 +1,32 @@
+# Build artifacts
+build/
+
+# Python packaging
+src/sbilby.egg-info/
+
+# Python cache
+__pycache__/
+*.pyc
+
+# Jupyter
+.ipynb_checkpoints/
+
+# Generated version file
+src/sbilby/_version.py
+
+# Example outputs / logs / results
+examples/RESULTS_working_sampling_Greg_whitened/
+examples/likelihood_cache/
+examples/outdir_greg_sampling_whitened/
+examples/sbi-logs/
+examples/Test/
+
+# Data files
+examples/*.gwf
+
+# Notebooks (if you don’t want to track any)
+examples/*.ipynb
+
+# Generated images / plots
+examples/*.png
+
