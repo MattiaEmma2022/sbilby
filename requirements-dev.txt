@@ -1,0 +1,7 @@
+jupyter
+ipykernel
+notebook
+pytest
+black
+ruff
+

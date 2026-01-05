@@ -2,3 +2,39 @@ numpy
 scipy
 pytest
 pytest-cov
+# Core scientific stack
+pandas>=1.5
+
+# Plotting (if sbilby produces plots)
+matplotlib>=3.6
+corner>=2.2
+
+# Bayesian inference
+bilby>=2.6
+dynesty>=2.1
+emcee>=3.1
+
+# SBI / ML
+torch
+sbi==0.22.0
+pyknos>=0.16
+zuko>=1.2
+nflows>=0.14
+
+# Probabilistic programming (if used)
+pymc>=5.0
+pytensor>=2.15
+
+# GW / LIGO stack (runtime only)
+gwpy>=3.0
+gwosc>=0.7
+gwdatafind>=1.2
+ligo-segments>=1.4
+python-lal>=7.6
+python-lalsimulation>=6.0
+
+# Utilities
+tqdm
+dill
+cloudpickle
+
