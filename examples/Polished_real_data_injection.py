@@ -320,7 +320,7 @@ noise=GenerateWhitenedIFONoise_realData(ifos[0],copy.deepcopy(noise_priors_h1),d
 signal=GenerateWhitenedSignal_realData(ifos[0], genA_waveform_generator, copy.deepcopy(signal_priors),data_4s,psd, use_mask, times, len(data_4s['H1'])) 
 signal_and_noise = [AdditiveSignalAndNoise_realData(signal, noise, len(data_4s['H1']))]   #Everything has to be in a list if we are using the multidetector code
 
-label = f"N{num_simulations}_fs{sampling_frequency}_seed{args.rseed}_R{args.repeat}_D{args.dimensions}_d{args.duration}"
+label = [f"N{num_simulations}_fs{sampling_frequency}_seed{args.rseed}_R{args.repeat}_D{args.dimensions}_d{args.duration}"]
 interferometer=['H1']
 benchmark_likelihood = sbilby.simulation_based_inference_multidetector_realData.NLEResidualLikelihood_realData(
         yobs,
