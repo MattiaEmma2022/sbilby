@@ -74,7 +74,7 @@ class BenchmarkLikelihood(object):
             priors=self.reference_prior,
             outdir=self.outdir,
             injection_parameters=injection_parameters,
-            label=self.nrle_likelihood.labels + "_REFERENCE",
+            label=self.nrle_likelihood.labels[0] + "_REFERENCE",
             conversion_function=bilby.gw.conversion.generate_all_bbh_parameters,
             **kwargs,
         )
@@ -84,7 +84,7 @@ class BenchmarkLikelihood(object):
             priors=self.priors,
             outdir=self.outdir,
             injection_parameters=injection_parameters,
-            label=self.nrle_likelihood.labels,
+            label=self.nrle_likelihood.labels[0],
             #conversion_function=bilby.gw.conversion.generate_all_bbh_parameters,
             **kwargs,
         )
