@@ -1,6 +1,8 @@
 # Build artifacts
 build/
-
+examples/data_1249439118.0_300.pkl
+examples/psd_data_1249439118.0_316.pkl
+examples/real_data_injection_bug_fix_change_seed/
 # Python packaging
 src/sbilby.egg-info/
 
