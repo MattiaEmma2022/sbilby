@@ -584,7 +584,7 @@ def create_ifo(data, ifo, trigger_time, inter,psd_yobs_use, waveform_generator, 
  )
      return ifon
 
-def load_or_generate_data(trigger_time, interferometers, data_duration, psd_data_length=0, data_dir="/home/mattia.emma/public_html/NLE/sbilbi/data", label="data", cache=True):
+def load_or_generate_data(trigger_time, interferometers, data_duration, psd_data_length=0, data_dir=".", label="data", cache=True):
     """
     Loads data from a pickle file if it exists, otherwise generates and saves it.
 
