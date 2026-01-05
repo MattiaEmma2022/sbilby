@@ -267,12 +267,12 @@ class NLELikelihood_realData(Likelihood):
         inf_and_sims = inference.append_simulations(simulated_params, simulated_yobs)
         self.sbi_likelihood_estimator.append(inf_and_sims.train(show_train_summary=True))
         # Plot the training and validation loss as a function of the training epochs without using tensorboard.
-        plt.plot(inference._summary['validation_log_probs'],label = 'validation',c = 'k')
-        plt.plot(inference._summary['training_log_probs'],label = 'training',c= 'tab:green')
-        plt.ylabel('loss')
-        plt.xlabel('Epochs')
-        plt.legend(loc= 'best')
-        plt.savefig("/home/mattia.emma/public_html/NLE/sbilbi/glitchy_invetigations/Study_bias/Training_"+str(self.num_simulations)+"_"+str(self.ifo)+".png",dpi=100)
+        # plt.plot(inference._summary['validation_log_probs'],label = 'validation',c = 'k')
+        # plt.plot(inference._summary['training_log_probs'],label = 'training',c= 'tab:green')
+        # plt.ylabel('loss')
+        # plt.xlabel('Epochs')
+        # plt.legend(loc= 'best')
+        #plt.savefig("/home/mattia.emma/public_html/NLE/sbilbi/glitchy_invetigations/Study_bias/Training_"+str(self.num_simulations)+"_"+str(self.ifo)+".png",dpi=100)
         if self.cache:
             logger.info(f"Writing the cached NLE to {self.cache_filename}")
             check_directory_exists_and_if_not_mkdir(self.cache_directory)
