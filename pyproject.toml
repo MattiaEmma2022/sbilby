@@ -1,6 +1,6 @@
 [build-system]
 requires = [
-    "setuptools>=42",
+    "setuptools>=77.0.3",
     "wheel",
     "setuptools_scm>=8"
 ]
@@ -8,19 +8,21 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "sbilby"
-authors = [{name = "Mattia Emma"}]
+authors = [
+  { name="Mattia Emma", email="mattia.emma@ligo.org" },
+]
 dynamic = ["version", "description"]
+readme = "README.md"
+requires-python = ">=3.9"
 classifiers = [
     "Programming Language :: Python :: 3",
     "Operating System :: OS Independent",
 ]
-dependencies = [
-  "numpy",
-]
+license = "MIT"
+license-files = ["LICEN[CS]E*"]
 
 [project.urls]
-Homepage = "TBD"
-Issues = "TBD"
-
+Homepage = "https://github.com/MattiaEmma2022/sbilby"
+Issues = "https://github.com/MattiaEmma2022/sbilby/issues"
 [tool.setuptools_scm]
 version_file = "src/sbilby/_version.py"
