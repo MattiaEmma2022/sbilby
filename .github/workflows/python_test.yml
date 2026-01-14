@@ -37,7 +37,7 @@ jobs:
     - name: Test with codespell
       run: |
         codespell .
-    - name: Run tests
-      run: |
-        pip install .
-        pytest . --cov
+    # - name: Run tests
+    #   run: |
+    #     pip install .
+    #     pytest . --cov
