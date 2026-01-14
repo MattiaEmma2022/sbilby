@@ -1,6 +1,6 @@
 [build-system]
 requires = [
-    "setuptools>=77.0.3",
+    "setuptools>=67",
     "wheel",
     "setuptools_scm>=8"
 ]
@@ -8,10 +8,8 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "sbilby"
-authors = [
-  { name="Mattia Emma", email="mattia.emma@ligo.org" },
-]
-dynamic = ["version", "description"]
+version = "0.0.1"
+description = "A package to perform residual neural likelihood evaluation for gravitational waves"
 readme = "README.md"
 requires-python = ">=3.9"
 classifiers = [
@@ -19,10 +17,11 @@ classifiers = [
     "Operating System :: OS Independent",
 ]
 license = "MIT"
-license-files = ["LICEN[CS]E*"]
+license-files = ["LICENSE"]
 
 [project.urls]
 Homepage = "https://github.com/MattiaEmma2022/sbilby"
 Issues = "https://github.com/MattiaEmma2022/sbilby/issues"
+
 [tool.setuptools_scm]
 version_file = "src/sbilby/_version.py"
