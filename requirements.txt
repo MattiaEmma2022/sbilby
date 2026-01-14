@@ -30,7 +30,6 @@ gwpy>=3.0
 gwosc>=0.7
 gwdatafind>=1.2
 ligo-segments>=1.4
-python-lal>=7.6
 python-lalsimulation>=6.0
 
 # Utilities
