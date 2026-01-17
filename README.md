@@ -14,7 +14,8 @@ Install the core package from PyPI:
 
 ```bash
 pip install sbilby
-
+#####Dependencies needed to run example code from the code repository
+pip install -r requirements.txt
 
 ## Optional LAL support
 
