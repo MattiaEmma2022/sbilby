@@ -6,6 +6,16 @@ examples/real_data_injection_bug_fix_change_seed/
 # Python packaging
 src/sbilby.egg-info/
 
+
+.coverage
+dist/
+examples/GW_working_multiple_Greg_same_data.py
+examples/GW_working_multiple_Greg_same_data.py:Zone.Identifier
+examples/Test_0_16384.gwf:Zone.Identifier
+examples/Test_noise_0_16384.gwf:Zone.Identifier
+examples/outdir_benchmark_sine-gaussian/*
+tests/*
+
 # Python cache
 __pycache__/
 *.pyc

@@ -5,6 +5,8 @@
 The package is designed to be installable via **pip**, while allowing advanced functionality when LAL is available.
 
 ---
+### Usage
+This package can be used to reproduce the plots and results of the RNLE study of Emma:2026 through the scripts publicly available on Zenodo 
 
 ## Installation
 
@@ -24,6 +26,10 @@ LAL is not available via pip. Install it using conda:
 ```bash
 conda install -c conda-forge python-lal python-lalsimulation
 pip install sbilby
+
+
+
+
 
 
 
